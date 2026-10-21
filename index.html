@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2563eb">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Control de asistencia</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#1b1f24;--mu:#6b7280;--ac:#2563eb;--ok:#16a34a;--bad:#dc2626;--bd:#e5e7eb}
+@media(prefers-color-scheme:dark){:root{--bg:#14171c;--card:#1e232b;--tx:#eef0f3;--mu:#9aa3b0;--ac:#60a5fa;--ok:#4ade80;--bad:#f87171;--bd:#2d343e}}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:var(--bg);color:var(--tx);padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+header{padding:14px 16px;font-weight:700;font-size:18px}
+nav{display:flex;gap:6px;padding:0 12px 10px;flex-wrap:wrap}
+nav button{border:1px solid var(--bd);background:var(--card);color:var(--tx);padding:9px 12px;border-radius:8px;font-size:14px}
+nav button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+main{padding:0 12px 30px;max-width:700px;margin:auto}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:12px}
+input,textarea{padding:9px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font-size:15px;width:100%;margin-bottom:8px}
+.btn{background:var(--ac);color:#fff;border:0;padding:10px 14px;border-radius:8px;font-size:14px;margin:2px 0}
+.btn.g{background:var(--ok)}.btn.r{background:var(--bad)}.btn.s{background:var(--mu)}
+.sc{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:7px;border-bottom:1px solid var(--bd);white-space:nowrap}
+.tab{display:none}.tab.on{display:block}
+#msg{margin-top:10px;padding:14px;border-radius:8px;font-weight:600;font-size:16px;display:none;text-align:center}
+#msg.ok{display:block;background:var(--ok);color:#fff}#msg.bad{display:block;background:var(--bad);color:#fff}
+.qrs{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.qc{text-align:center;border:1px solid var(--bd);border-radius:10px;padding:8px;background:#fff;color:#000}
+.pres{color:var(--ok);font-weight:600}.aus{color:var(--bad);font-weight:600}
+.mu{color:var(--mu);font-size:13px;margin:4px 0 8px}
+@media print{header,nav,.card:not(#qrcard),.noprint{display:none!important}body{background:#fff}}
+</style>
+</head>
+<body>
+<header>Control de asistencia</header>
+<nav>
+<button data-t="scan" class="on">Escanear</button>
+<button data-t="hoy">Hoy</button>
+<button data-t="emp">Empleados</button>
+<button data-t="reg">Registros</button>
+</nav>
+<main>
+
+<section id="scan" class="tab on">
+<div class="card">
+<div id="reader"></div>
+<div style="text-align:center;margin-top:10px">
+<button class="btn g" id="start">Activar cámara</button>
+<button class="btn r" id="stop" style="display:none">Detener</button>
+</div>
+<div id="msg"></div>
+</div>
+<div class="card">
+<b>Ingreso manual</b>
+<div class="mu">Si la cámara no abre, escribí el ID (ej: E001).</div>
+<input id="man" placeholder="E001" autocapitalize="characters">
+<button class="btn" id="manb">Registrar</button>
+</div>
+</section>
+
+<section id="hoy" class="tab">
+<div class="card"><b id="hoyT"></b><div class="sc"><table id="hoyTb"></table></div></div>
+</section>
+
+<section id="emp" class="tab">
+<div class="card">
+<b>Agregar empleado</b>
+<input id="nom" placeholder="Nombre" style="margin-top:8px">
+<input id="cuil" placeholder="CUIL (opcional)" inputmode="numeric">
+<button class="btn" id="add">Agregar</button>
+</div>
+<div class="card noprint">
+<b>Importar lista</b>
+<div class="mu">Una persona por línea: Nombre; CUIL. Podés copiar dos columnas desde Excel.</div>
+<textarea id="imp" rows="5"></textarea>
+<button class="btn" id="impb">Importar</button> <span id="impm"></span>
+</div>
+<div class="card" id="qrcard"><b>Códigos QR</b>
+<div class="mu">Cada QR lleva solo el ID, no el CUIL. Sacales captura o imprimilos.</div>
+<div class="qrs" id="qrs"></div></div>
+</section>
+
+<section id="reg" class="tab">
+<div class="card">
+<button class="btn g" id="xl">Exportar a Excel</button>
+<div class="sc" style="margin-top:10px"><table id="regTb"></table></div>
+</div>
+<div class="card">
+<b>Copia de seguridad</b>
+<div class="mu">Los datos viven solo en este celular. Guardá una copia seguido.</div>
+<button class="btn s" id="bk">Descargar copia</button>
+<button class="btn s" id="rs">Restaurar copia</button>
+<input type="file" id="rsf" accept=".json,application/json" style="display:none">
+<hr style="border:0;border-top:1px solid var(--bd);margin:10px 0">
+<button class="btn r" id="clr">Borrar todos los registros</button>
+</div>
+</section>
+</main>
+
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const today=()=>new Date().toLocaleDateString('sv');
+const hora=()=>new Date().toLocaleTimeString('es',{hour12:false});
+const digits=s=>String(s||'').replace(/\D/g,'');
+function load(k){try{return JSON.parse(localStorage.getItem(k))||[]}catch(e){return[]}}
+let emp=load('emp'),regs=load('regs'),last={},sc=null,busy=false,AC;
+function save(){try{localStorage.setItem('emp',JSON.stringify(emp));localStorage.setItem('regs',JSON.stringify(regs))}catch(e){msg('No se pudo guardar en el celular',false)}}
+try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
+
+function ac(){try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();if(AC.resume)AC.resume();return AC}catch(e){return null}}
+function beep(ok){
+  try{const a=ac(),o=a.createOscillator(),g=a.createGain();o.connect(g);g.connect(a.destination);
+    o.frequency.value=ok?880:220;g.gain.value=.3;o.start();o.stop(a.currentTime+(ok?.15:.4));}catch(e){}
+  try{if(ok&&navigator.vibrate)navigator.vibrate(120)}catch(e){}
+}
+function msg(t,ok){const m=$('#msg');m.className=ok?'ok':'bad';m.textContent=t;clearTimeout(msg.t);msg.t=setTimeout(()=>m.className='',3500)}
+
+function onScan(code){
+  if(busy)return;busy=true;
+  try{
+    const e=emp.find(x=>x.id===String(code).trim().toUpperCase());
+    if(!e){beep(false);msg('QR no reconocido',false);return}
+    const now=Date.now();
+    if(last[e.id]&&now-last[e.id]<10000){msg('Ya registrado: '+e.nombre,true);return}
+    last[e.id]=now;
+    const f=today(),n=regs.filter(r=>r.eid===e.id&&r.fecha===f).length;
+    const tipo=n%2?'Salida':'Entrada',h=hora();
+    regs.unshift({eid:e.id,nombre:e.nombre,cuil:e.cuil||'',fecha:f,hora:h,tipo:tipo,ts:now});
+    save();render();beep(true);msg(tipo+' registrada: '+e.nombre+' ('+h+')',true);
+  }finally{setTimeout(()=>busy=false,1500)}
+}
+
+async function startCam(mode){
+  sc=new Html5Qrcode('reader');
+  await sc.start({facingMode:mode},{fps:10,qrbox:230},onScan,()=>{});
+  $('#start').style.display='none';$('#stop').style.display='inline-block';
+}
+$('#start').onclick=async()=>{
+  ac();
+  try{await startCam('environment')}
+  catch(e){try{await startCam('user')}catch(e2){msg('No se pudo abrir la cámara. Revisá los permisos o usá el ingreso manual.',false)}}
+};
+$('#stop').onclick=async()=>{try{await sc.stop()}catch(e){}$('#stop').style.display='none';$('#start').style.display='inline-block'};
+$('#manb').onclick=()=>{ac();const v=$('#man').value.trim();$('#man').value='';if(v)onScan(v)};
+
+function nextId(){
+  const n=emp.reduce((m,x)=>Math.max(m,parseInt(String(x.id).slice(1))||0),0)+1;
+  return 'E'+String(n).padStart(3,'0');
+}
+$('#add').onclick=()=>{
+  const n=$('#nom').value.trim();if(!n)return;
+  emp.push({id:nextId(),nombre:n,cuil:digits($('#cuil').value)});
+  $('#nom').value='';$('#cuil').value='';save();render();
+};
+$('#impb').onclick=()=>{
+  let add=0,rep=0;
+  for(const line of $('#imp').value.split('\n')){
+    const parts=line.split(/[;\t,]/).map(p=>p.trim()).filter(Boolean);if(!parts.length)continue;
+    let cuil='',nom=[];
+    for(const p of parts){const d=digits(p);if(d.length===11&&!cuil)cuil=d;else nom.push(p)}
+    const nombre=nom.join(' ').trim();
+    if(!nombre||(!cuil&&/cuil/i.test(line)))continue;
+    if(cuil&&emp.some(e=>e.cuil===cuil)){rep++;continue}
+    emp.push({id:nextId(),nombre,cuil});add++;
+  }
+  $('#imp').value='';$('#impm').textContent='Agregados: '+add+(rep?' · Repetidos omitidos: '+rep:'');
+  save();render();
+};
+function twoStep(btn,txt,fn){
+  if(btn.dataset.s!=='1'){btn.dataset.s='1';const o=btn.textContent;btn.textContent='¿Seguro?';
+    setTimeout(()=>{btn.dataset.s='';btn.textContent=o},3000);return}
+  btn.dataset.s='';fn();
+}
+window.quitar=(id,btn)=>twoStep(btn,'Quitar',()=>{emp=emp.filter(e=>e.id!==id);save();render()});
+$('#clr').onclick=e=>twoStep(e.target,'',()=>{regs=[];save();render()});
+
+function qrimg(t){const q=qrcode(0,'M');q.addData(t);q.make();return q.createImgTag(4)}
+let empKey='';
+function render(){
+  const k=JSON.stringify(emp);
+  if(k!==empKey){empKey=k;
+    $('#qrs').innerHTML=emp.map(e=>'<div class="qc">'+qrimg(e.id)+'<div><b>'+esc(e.nombre)+'</b></div><small>'+esc(e.id)+'</small><br><button class="btn r noprint" style="margin-top:6px;padding:4px 8px" onclick="quitar(\''+esc(e.id)+'\',this)">Quitar</button></div>').join('')||'<span class="mu">Agregá empleados para generar sus QR.</span>';
+  }
+  const f=today(),hoy=regs.filter(r=>r.fecha===f).sort((a,b)=>a.ts-b.ts);
+  const rows=emp.map(e=>{const m=hoy.filter(r=>r.eid===e.id);
+    return{nombre:e.nombre,cuil:e.cuil||'',estado:m.length?'Presente':'Ausente',entrada:m.length?m[0].hora:'',salida:m.length>1?m[m.length-1].hora:''}});
+  const p=rows.filter(r=>r.estado==='Presente').length;
+  $('#hoyT').textContent='Hoy '+f+' — Presentes: '+p+' / Ausentes: '+(rows.length-p);
+  $('#hoyTb').innerHTML='<tr><th>Empleado</th><th>Estado</th><th>Entrada</th><th>Salida</th></tr>'+rows.map(r=>'<tr><td>'+esc(r.nombre)+'</td><td class="'+(r.estado==='Presente'?'pres':'aus')+'">'+r.estado+'</td><td>'+r.entrada+'</td><td>'+r.salida+'</td></tr>').join('');
+  $('#regTb').innerHTML='<tr><th>Fecha</th><th>Hora</th><th>Empleado</th><th>Tipo</th></tr>'+regs.slice(0,300).map(l=>'<tr><td>'+l.fecha+'</td><td>'+l.hora+'</td><td>'+esc(l.nombre)+'</td><td>'+l.tipo+'</td></tr>').join('');
+  window._rows=rows;
+}
+
+$('#xl').onclick=()=>{
+  try{
+    const wb=XLSX.utils.book_new();
+    const all=regs.slice().sort((a,b)=>a.ts-b.ts);
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(all.map(l=>({Fecha:l.fecha,Hora:l.hora,ID:l.eid,Empleado:l.nombre,CUIL:l.cuil,Tipo:l.tipo}))),'Registros');
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(window._rows.map(r=>({Empleado:r.nombre,CUIL:r.cuil,Estado:r.estado,Entrada:r.entrada,Salida:r.salida}))),'Hoy');
+    XLSX.writeFile(wb,'asistencia_'+today()+'.xlsx');
+  }catch(e){alert('No se pudo exportar. Verificá la conexión la primera vez.')}
+};
+$('#bk').onclick=()=>{
+  const b=new Blob([JSON.stringify({emp,regs})],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='copia_asistencia_'+today()+'.json';
+  document.body.appendChild(a);a.click();a.remove();
+};
+$('#rs').onclick=()=>$('#rsf').click();
+$('#rsf').onchange=e=>{
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{try{const d=JSON.parse(r.result);
+    if(!Array.isArray(d.emp)||!Array.isArray(d.regs))throw 0;
+    emp=d.emp;regs=d.regs;save();render();alert('Copia restaurada.')}catch(x){alert('Archivo no válido.')}};
+  r.readAsText(f);e.target.value='';
+};
+
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('nav button,.tab').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');$('#'+b.dataset.t).classList.add('on');
+});
+render();
+if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+</script>
+</body>
+</html>
