@@ -1,5 +1,5 @@
-// Si cambias index.html, subi la version (v1 -> v2) para que los celulares se actualicen.
-const V = 'asistencia-v1';
+// Si cambias index.html, subi la version (v2 -> v3) para que los celulares se actualicen.
+const V = 'asistencia-v2';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 const CDN = [
   'https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js',
